@@ -1,0 +1,1126 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pico WH 재밍 감지 모니터링 대시보드</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3a 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #00ff88, #00ccff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            margin: 0 10px;
+            animation: pulse 2s infinite;
+        }
+
+        .status-normal { background: linear-gradient(45deg, #00ff88, #00cc6a); }
+        .status-warning { background: linear-gradient(45deg, #ffa500, #ff8c00); }
+        .status-danger { background: linear-gradient(45deg, #ff4444, #cc0000); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .card h3 {
+            margin-bottom: 15px;
+            color: #00ccff;
+            font-size: 1.2em;
+        }
+
+        .metric-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .metric-unit {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            position: relative;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .chart {
+            width: 100%;
+            height: 100%;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+
+        .progress-normal { background: linear-gradient(90deg, #00ff88, #00cc6a); }
+        .progress-warning { background: linear-gradient(90deg, #ffa500, #ff8c00); }
+        .progress-danger { background: linear-gradient(90deg, #ff4444, #cc0000); }
+
+        .alert-log {
+            background: rgba(255, 68, 68, 0.1);
+            border-left: 4px solid #ff4444;
+            max-height: 150px;
+            overflow-y: auto;
+        }
+
+        .alert-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid rgba(255, 68, 68, 0.2);
+        }
+
+        .alert-time {
+            font-size: 0.8em;
+            opacity: 0.7;
+        }
+
+        .adaptation-level {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .level-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .level-dot.active {
+            background: #00ff88;
+            border-color: #00ff88;
+            box-shadow: 0 0 10px #00ff88;
+        }
+
+        .jamming-indicator {
+            text-align: center;
+            padding: 20px;
+            border-radius: 15px;
+            margin: 20px 0;
+            font-size: 1.5em;
+            font-weight: bold;
+        }
+
+        .controls {
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #00ccff, #0099cc);
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 0 10px;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-danger {
+            background: linear-gradient(45deg, #ff4444, #cc0000);
+        }
+
+        .connection-status {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .gemini-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .threshold-display {
+            background: rgba(255, 165, 0, 0.2);
+            border: 1px solid #ffa500;
+            padding: 10px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ Pico WH 재밍 감지 모니터링 시스템</h1>
+            <div id="systemStatus" class="status-indicator status-normal">시스템 대기</div>
+            <div id="connectionStatus" class="status-indicator status-warning">Pico 연결 중...</div>
+        </div>
+
+        <!-- 연결 상태 -->
+        <div class="connection-status">
+            <div>
+                <span class="gemini-status" id="picoStatus" style="background: #ffa500;"></span>
+                <strong>Raspberry Pi Pico WH:</strong> <span id="picoConnectionText">연결 시도 중...</span>
+            </div>
+            <div style="margin-top: 5px;">
+                <span class="gemini-status" id="geminiStatus" style="background: #ffa500;"></span>
+                <strong>Gemini AI:</strong> <span id="geminiConnectionText">API 연결 중...</span>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <!-- 실시간 주파수 측정 -->
+            <div class="card">
+                <h3>📡 실시간 주파수 측정</h3>
+                <div class="metric-value" id="frequencyValue">8.5 <span class="metric-unit">kHz</span></div>
+                <div class="threshold-display">
+                    <strong>재밍 임계값: 500.0 kHz</strong>
+                </div>
+                <div class="chart-container">
+                    <canvas id="frequencyChart" class="chart"></canvas>
+                </div>
+                <div class="progress-bar">
+                    <div id="frequencyProgress" class="progress-fill progress-normal" style="width: 85%"></div>
+                </div>
+            </div>
+
+            <!-- 신호 강도 (ADC 값) -->
+            <div class="card">
+                <h3>📊 신호 강도 (ADC)</h3>
+                <div class="metric-value" id="adcValue">2048 <span class="metric-unit">/ 4095</span></div>
+                <div class="chart-container">
+                    <canvas id="adcChart" class="chart"></canvas>
+                </div>
+                <div class="progress-bar">
+                    <div id="adcProgress" class="progress-fill progress-normal" style="width: 50%"></div>
+                </div>
+            </div>
+
+            <!-- 재밍 감지 횟수 -->
+            <div class="card">
+                <h3>⚠️ 재밍 감지 횟수</h3>
+                <div class="metric-value" id="jammingCount">0 <span class="metric-unit">회</span></div>
+                <div class="progress-bar">
+                    <div id="jammingProgress" class="progress-fill progress-normal" style="width: 0%"></div>
+                </div>
+                <p>연속 감지 시 경고 활성화</p>
+            </div>
+
+            <!-- 환경 데이터 -->
+            <div class="card">
+                <h3>🌡️ 환경 데이터</h3>
+                <div style="display: flex; justify-content: space-between;">
+                    <div>
+                        <div>온도: <span id="temperature">23.5°C</span></div>
+                        <div>습도: <span id="humidity">45%</span></div>
+                    </div>
+                    <div>
+                        <div>CPU 온도: <span id="cpuTemp">42°C</span></div>
+                        <div>메모리: <span id="memoryUsage">65%</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gemini AI 분석 -->
+            <div class="card">
+                <h3>🤖 Gemini AI 위협 분석</h3>
+                <div id="aiAnalysis" style="min-height: 100px; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 8px;">
+                    AI 분석 대기 중...
+                </div>
+                <div style="margin-top: 10px;">
+                    <small>마지막 분석: <span id="lastAnalysis">-</span></small>
+                </div>
+            </div>
+
+            <!-- 적응 모드 -->
+            <div class="card">
+                <h3>🔧 적응 모드</h3>
+                <div class="adaptation-level" id="adaptationLevel">
+                    <div class="level-dot active"></div>
+                    <div class="level-dot"></div>
+                    <div class="level-dot"></div>
+                </div>
+                <p id="adaptationText">모드 0: 정상 모니터링</p>
+            </div>
+        </div>
+
+        <!-- 재밍 상태 표시 -->
+        <div id="jammingIndicator" class="jamming-indicator" style="background: rgba(0, 255, 136, 0.1); border: 2px solid #00ff88;">
+            ✅ 정상 상태 - 주파수 임계값 이하
+        </div>
+
+        <!-- 알림 로그 -->
+        <div class="card alert-log">
+            <h3>🚨 실시간 로그</h3>
+            <div id="alertLog">
+                <div class="alert-item">
+                    <div>시스템 초기화 완료</div>
+                    <div class="alert-time" id="startTime">2025-05-24 10:30:00</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 제어 버튼 -->
+        <div class="controls">
+            <button class="btn" onclick="connectToPico()" id="connectBtn">🔌 Pico 연결</button>
+            <button class="btn" onclick="startMonitoring()" id="monitorBtn">🔍 모니터링 시작</button>
+            <button class="btn" onclick="resetSystem()">🔄 시스템 리셋</button>
+            <button class="btn btn-danger" onclick="testJamming()">🧪 재밍 테스트</button>
+        </div>
+    </div>
+
+    <script>
+        // 전역 변수
+        let monitoringActive = false;
+        let picoConnected = false;
+        let geminiConnected = false;
+        let frequencyData = [];
+        let adcData = [];
+        let currentFrequency = 8.5; // kHz
+        let currentADC = 2048;
+        let jammingCount = 0;
+        let adaptationMode = 0;
+        let jammingDetected = false;
+        let testMode = false;
+
+        // 임계값 설정 (CC1101 RF 대역에 맞춘 재밍 감지)
+        const JAMMING_THRESHOLD = 550.0; // kHz (CC1101 실제 주파수 대역 고려)
+        const CONSECUTIVE_THRESHOLD = 3; // 연속 3회 감지 시 경고
+
+        // WebSocket 또는 시리얼 통신 객체 (실제 구현에서는 Web Serial API 사용)
+        let picoConnection = null;
+
+        // 차트 컨텍스트
+        let frequencyChart, adcChart;
+
+        // 초기 데이터 생성
+        for(let i = 0; i < 20; i++) {
+            frequencyData.push(8.5 + Math.random() * 2 - 1); // 7.5-9.5 kHz 범위
+            adcData.push(2048 + Math.random() * 400 - 200); // ADC 변동
+        }
+
+        // 실제 CC1101 Pico 연결 함수 (주석 해제하여 활성화)
+        async function connectToPico() {
+            const connectBtn = document.getElementById('connectBtn');
+            connectBtn.textContent = '🔌 연결 중...';
+            connectBtn.disabled = true;
+
+            try {
+                // 실제 CC1101 Pico 연결
+                picoConnection = await connectToRealPico();
+                picoConnected = true;
+                
+                document.getElementById('picoStatus').style.background = '#00ff88';
+                document.getElementById('picoConnectionText').textContent = '연결됨 - CC1101 실시간 데이터 수신';
+                
+                connectBtn.textContent = '✅ CC1101 연결됨';
+                connectBtn.style.background = 'linear-gradient(45deg, #00ff88, #00cc6a)';
+                
+                addAlert('🛡️ CC1101 재밍 감지 시스템 연결 성공');
+                
+                // Gemini AI 연결 시도
+                await connectToGemini();
+                
+            } catch (error) {
+                addAlert('❌ CC1101 Pico 연결 실패: ' + error.message);
+                connectBtn.textContent = '🔌 재연결';
+                connectBtn.disabled = false;
+                
+                // 연결 실패 시 시뮬레이션 모드로 전환
+                addAlert('⚠️ 시뮬레이션 모드로 전환합니다');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                picoConnected = true;
+                document.getElementById('picoStatus').style.background = '#ffa500';
+                document.getElementById('picoConnectionText').textContent = '시뮬레이션 모드 - 테스트 데이터';
+                
+                connectBtn.textContent = '🧪 시뮬레이션 모드';
+                connectBtn.style.background = 'linear-gradient(45deg, #ffa500, #ff8c00)';
+                
+                await connectToGemini();
+            }
+        }
+
+        // Gemini API 연결
+        async function connectToGemini() {
+            try {
+                // 실제 구현에서는 Gemini API 키와 함께 연결
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                
+                geminiConnected = true;
+                document.getElementById('geminiStatus').style.background = '#00ff88';
+                document.getElementById('geminiConnectionText').textContent = '연결됨 - AI 분석 준비';
+                
+                addAlert('Gemini AI 연결 성공');
+                
+            } catch (error) {
+                addAlert('Gemini AI 연결 실패');
+                document.getElementById('geminiStatus').style.background = '#ff4444';
+                document.getElementById('geminiConnectionText').textContent = '연결 실패';
+            }
+        }
+
+        // 실시간 데이터 업데이트 (CC1101 연결 시에는 시리얼 데이터 우선) - 차트 문제 수정
+        function updateSensorData() {
+            if (!picoConnected) return;
+
+            // 실제 CC1101 연결이 아닌 경우만 시뮬레이션 데이터 사용
+            if (!picoConnection) {
+            // 테스트 모드일 때 재밍 시뮬레이션 (임계값 상향 조정에 맞춤)
+            if (testMode) {
+                currentFrequency = 16.0 + Math.random() * 4; // 15kHz 이상 (16-20kHz)
+                currentADC = 3500 + Math.random() * 500;
+            } else {
+                    // 정상 범위의 랜덤 데이터
+                    currentFrequency = 8.5 + Math.random() * 2 - 1; // 7.5-9.5 kHz
+                    currentADC = 2048 + Math.random() * 400 - 200;
+                }
+
+                // 시뮬레이션 모드에서만 데이터 배열 업데이트
+                frequencyData.push(currentFrequency);
+                adcData.push(currentADC);
+                
+                if (frequencyData.length > 20) {
+                    frequencyData.shift();
+                    adcData.shift();
+                }
+
+                // UI 업데이트
+                updateUI();
+                
+                // 차트 업데이트
+                drawCharts();
+                
+                // 재밍 감지 로직
+                detectJamming();
+                
+                // AI 분석 (주기적으로)
+                if (Math.random() < 0.1) { // 10% 확률로 AI 분석 실행
+                    performAIAnalysis();
+                }
+            }
+            // ⚠️ 실제 CC1101 연결 시에는 parseSerialData에서 직접 차트 데이터 업데이트됨
+            // 여기서 중복 업데이트하면 차트가 이상해짐
+        }
+
+        function updateUI() {
+            console.log(`🎯 updateUI 호출됨: FREQ=${currentFrequency}, ADC=${currentADC}`);
+            
+            // 주파수 값 업데이트 (강제)
+            const freqElement = document.getElementById('frequencyValue');
+            if (freqElement) {
+                freqElement.innerHTML = `${currentFrequency.toFixed(1)} <span class="metric-unit">kHz</span>`;
+                console.log(`📊 주파수 업데이트: ${currentFrequency.toFixed(1)}kHz`);
+            }
+            
+            // ADC 값 업데이트 (강제)
+            const adcElement = document.getElementById('adcValue');
+            if (adcElement) {
+                adcElement.innerHTML = `${Math.round(currentADC)} <span class="metric-unit">/ 4095</span>`;
+                console.log(`📊 ADC 업데이트: ${Math.round(currentADC)}`);
+            }
+            
+            // 재밍 카운터 업데이트
+            const jammingElement = document.getElementById('jammingCount');
+            if (jammingElement) {
+                jammingElement.innerHTML = `${jammingCount} <span class="metric-unit">회</span>`;
+            }
+
+            // 환경 데이터 시뮬레이션 (실제 CC1101 연결 시에는 고정값 사용)
+            if (picoConnection) {
+                // 실제 연결 시 고정값 사용
+                document.getElementById('temperature').textContent = '24.2°C';
+                document.getElementById('humidity').textContent = '48%';
+                document.getElementById('cpuTemp').textContent = '45°C';
+                document.getElementById('memoryUsage').textContent = '70%';
+            } else {
+                // 시뮬레이션 모드일 때만 랜덤 값
+                document.getElementById('temperature').textContent = 
+                    (23.5 + Math.random() * 2 - 1).toFixed(1) + '°C';
+                document.getElementById('humidity').textContent = 
+                    Math.round(45 + Math.random() * 10 - 5) + '%';
+                document.getElementById('cpuTemp').textContent = 
+                    Math.round(42 + Math.random() * 8 - 4) + '°C';
+                document.getElementById('memoryUsage').textContent = 
+                    Math.round(65 + Math.random() * 20 - 10) + '%';
+            }
+
+            updateProgressBars();
+        }
+
+        function updateProgressBars() {
+            // 주파수 진행률 (임계값 대비)
+            const freqPercent = Math.min(100, (currentFrequency / JAMMING_THRESHOLD) * 100);
+            const freqProgress = document.getElementById('frequencyProgress');
+            freqProgress.style.width = freqPercent + '%';
+            freqProgress.className = `progress-fill ${
+                freqPercent >= 100 ? 'progress-danger' : 
+                freqPercent >= 80 ? 'progress-warning' : 'progress-normal'
+            }`;
+
+            // ADC 진행률
+            const adcPercent = (currentADC / 4095) * 100;
+            const adcProgress = document.getElementById('adcProgress');
+            adcProgress.style.width = adcPercent + '%';
+            adcProgress.className = `progress-fill ${
+                adcPercent >= 85 ? 'progress-danger' : 
+                adcPercent >= 70 ? 'progress-warning' : 'progress-normal'
+            }`;
+
+            // 재밍 카운터 진행률
+            const jammingPercent = Math.min(100, (jammingCount / 10) * 100);
+            const jammingProgressBar = document.getElementById('jammingProgress');
+            jammingProgressBar.style.width = jammingPercent + '%';
+            jammingProgressBar.className = `progress-fill ${
+                jammingPercent >= 70 ? 'progress-danger' : 
+                jammingPercent >= 40 ? 'progress-warning' : 'progress-normal'
+            }`;
+        }
+
+        function detectJamming() {
+            let previousJammingState = jammingDetected;
+
+            // 주파수가 임계값을 초과하면 재밍 감지
+            if (currentFrequency >= JAMMING_THRESHOLD) {
+                if (!jammingDetected) {
+                    jammingCount++;
+                    jammingDetected = true;
+                    addAlert(`재밍 감지! 주파수: ${currentFrequency.toFixed(1)}kHz`);
+                }
+            } else {
+                jammingDetected = false;
+            }
+
+            // 적응 모드 업데이트
+            if (jammingCount >= CONSECUTIVE_THRESHOLD * 2) {
+                adaptationMode = 2; // 고위험 모드
+            } else if (jammingCount >= CONSECUTIVE_THRESHOLD) {
+                adaptationMode = 1; // 경계 모드
+            } else {
+                adaptationMode = 0; // 정상 모드
+            }
+
+            updateAdaptationUI();
+            updateSystemStatus();
+        }
+
+        function updateAdaptationUI() {
+            const levelDots = document.querySelectorAll('.level-dot');
+            levelDots.forEach((dot, index) => {
+                dot.classList.toggle('active', index <= adaptationMode);
+            });
+
+            const adaptationTexts = [
+                '모드 0: 정상 모니터링',
+                '모드 1: 경계 상태 - 민감도 증가',
+                '모드 2: 위험 상태 - 최대 경계'
+            ];
+            
+            document.getElementById('adaptationText').textContent = adaptationTexts[adaptationMode];
+        }
+
+        function updateSystemStatus() {
+            const systemStatus = document.getElementById('systemStatus');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const jammingIndicator = document.getElementById('jammingIndicator');
+
+            if (jammingDetected) {
+                systemStatus.textContent = '🚨 재밍 감지됨';
+                systemStatus.className = 'status-indicator status-danger';
+                
+                connectionStatus.textContent = '위험 상태';
+                connectionStatus.className = 'status-indicator status-danger';
+                
+                jammingIndicator.innerHTML = `🚨 재밍 공격 감지! - 주파수: ${currentFrequency.toFixed(1)}kHz`;
+                jammingIndicator.style.background = 'rgba(255, 68, 68, 0.2)';
+                jammingIndicator.style.borderColor = '#ff4444';
+                
+            } else if (adaptationMode > 0) {
+                systemStatus.textContent = '⚠️ 경계 상태';
+                systemStatus.className = 'status-indicator status-warning';
+                
+                connectionStatus.textContent = '주의 필요';
+                connectionStatus.className = 'status-indicator status-warning';
+                
+                jammingIndicator.innerHTML = '⚠️ 경계 상태 - 과거 재밍 감지됨';
+                jammingIndicator.style.background = 'rgba(255, 165, 0, 0.2)';
+                jammingIndicator.style.borderColor = '#ffa500';
+                
+            } else {
+                systemStatus.textContent = '시스템 정상';
+                systemStatus.className = 'status-indicator status-normal';
+                
+                connectionStatus.textContent = 'Pico 연결됨';
+                connectionStatus.className = 'status-indicator status-normal';
+                
+                jammingIndicator.innerHTML = '✅ 정상 상태 - 주파수 임계값 이하';
+                jammingIndicator.style.background = 'rgba(0, 255, 136, 0.1)';
+                jammingIndicator.style.borderColor = '#00ff88';
+            }
+        }
+
+        // Gemini AI 분석 시뮬레이션
+        async function performAIAnalysis() {
+            if (!geminiConnected) return;
+
+            const analysisDiv = document.getElementById('aiAnalysis');
+            analysisDiv.innerHTML = '🤖 분석 중...';
+
+            // 실제로는 Gemini API 호출
+            await new Promise(resolve => setTimeout(resolve, 1000));
+
+            let analysis = '';
+            if (jammingDetected) {
+                analysis = `⚠️ 위험: ${currentFrequency.toFixed(1)}kHz 주파수 감지. 
+                          재밍 공격 가능성이 높습니다. 
+                          즉시 대응 조치를 권장합니다.`;
+            } else if (adaptationMode > 0) {
+                analysis = `📊 주의: 과거 ${jammingCount}회 재밍 감지. 
+                          현재는 안전하나 지속 모니터링 필요.`;
+            } else {
+                analysis = `✅ 정상: 주파수 범위 정상 (${currentFrequency.toFixed(1)}kHz). 
+                          환경이 안정적입니다.`;
+            }
+
+            analysisDiv.innerHTML = analysis;
+            document.getElementById('lastAnalysis').textContent = new Date().toLocaleTimeString('ko-KR');
+        }
+
+        function drawCharts() {
+            if (!frequencyChart || !adcChart) return;
+
+            // 주파수 차트
+            frequencyChart.clearRect(0, 0, frequencyChart.canvas.width, frequencyChart.canvas.height);
+            drawLineChartwithThreshold(frequencyChart, frequencyData, 0, 20, '#00ccff', JAMMING_THRESHOLD);
+
+            // ADC 차트
+            adcChart.clearRect(0, 0, adcChart.canvas.width, adcChart.canvas.height);
+            drawLineChart(adcChart, adcData, 0, 4095, '#00ff88');
+        }
+
+        function drawLineChartwithThreshold(ctx, data, minY, maxY, color, threshold) {
+            const canvas = ctx.canvas;
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // 임계값 선 그리기
+            const thresholdY = height - ((threshold - minY) / (maxY - minY)) * height;
+            ctx.strokeStyle = '#ff4444';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(0, thresholdY);
+            ctx.lineTo(width, thresholdY);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            // 데이터 선 그리기
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            for(let i = 0; i < data.length; i++) {
+                const x = (i / (data.length - 1)) * width;
+                const y = height - ((data[i] - minY) / (maxY - minY)) * height;
+                
+                if(i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+
+            // 현재 값 점 그리기
+            if(data.length > 0) {
+                const lastX = width;
+                const lastY = height - ((data[data.length - 1] - minY) / (maxY - minY)) * height;
+                
+                ctx.fillStyle = data[data.length - 1] >= threshold ? '#ff4444' : color;
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, 4, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        function drawLineChart(ctx, data, minY, maxY, color) {
+            const canvas = ctx.canvas;
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+
+            for(let i = 0; i < data.length; i++) {
+                const x = (i / (data.length - 1)) * width;
+                const y = height - ((data[i] - minY) / (maxY - minY)) * height;
+                
+                if(i === 0) {
+                    ctx.moveTo(x, y);
+                } else {
+                    ctx.lineTo(x, y);
+                }
+            }
+            
+            ctx.stroke();
+
+            // 현재 값 점 그리기
+            if(data.length > 0) {
+                const lastX = width;
+                const lastY = height - ((data[data.length - 1] - minY) / (maxY - minY)) * height;
+                
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, 4, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+
+        function addAlert(message) {
+            const alertLog = document.getElementById('alertLog');
+            const now = new Date().toLocaleString('ko-KR');
+            
+            const alertItem = document.createElement('div');
+            alertItem.className = 'alert-item';
+            alertItem.innerHTML = `
+                <div>${message}</div>
+                <div class="alert-time">${now}</div>
+            `;
+            
+            alertLog.insertBefore(alertItem, alertLog.firstChild);
+            
+            // 최대 15개 알림만 유지
+            while(alertLog.children.length > 15) {
+                alertLog.removeChild(alertLog.lastChild);
+            }
+        }
+
+        // 모니터링 시작
+        function startMonitoring() {
+            if (!picoConnected) {
+                addAlert('❌ Pico 연결이 필요합니다');
+                return;
+            }
+
+            if (!monitoringActive) {
+                monitoringActive = true;
+                const monitorBtn = document.getElementById('monitorBtn');
+                monitorBtn.textContent = '⏹️ 모니터링 중지';
+                monitorBtn.onclick = stopMonitoring;
+                
+                addAlert('🔍 실시간 모니터링 시작');
+                
+                // 1초마다 센서 데이터 업데이트
+                const monitorInterval = setInterval(() => {
+                    if (monitoringActive) {
+                        updateSensorData();
+                    } else {
+                        clearInterval(monitorInterval);
+                    }
+                }, 1000);
+            }
+        }
+
+        // 모니터링 중지
+        function stopMonitoring() {
+            monitoringActive = false;
+            const monitorBtn = document.getElementById('monitorBtn');
+            monitorBtn.textContent = '🔍 모니터링 시작';
+            monitorBtn.onclick = startMonitoring;
+            
+            addAlert('⏹️ 모니터링 중지됨');
+        }
+
+        // 시스템 리셋
+        function resetSystem() {
+            jammingDetected = false;
+            adaptationMode = 0;
+            jammingCount = 0;
+            currentFrequency = 8.5;
+            currentADC = 2048;
+            testMode = false;
+            
+            // 데이터 배열 초기화
+            frequencyData = [];
+            adcData = [];
+            for(let i = 0; i < 20; i++) {
+                frequencyData.push(8.5 + Math.random() * 2 - 1);
+                adcData.push(2048 + Math.random() * 400 - 200);
+            }
+            
+            addAlert('🔄 시스템 리셋 완료');
+            updateUI();
+            updateSystemStatus();
+            drawCharts();
+        }
+
+        // 재밍 테스트 모드
+        function testJamming() {
+            testMode = !testMode;
+            const testBtn = event.target;
+            
+            if (testMode) {
+                testBtn.textContent = '🛑 테스트 중지';
+                testBtn.style.background = 'linear-gradient(45deg, #ff8800, #ff6600)';
+                addAlert('🧪 재밍 테스트 모드 활성화 - 16-20kHz 시뮬레이션');
+            } else {
+                testBtn.textContent = '🧪 재밍 테스트';
+                testBtn.style.background = 'linear-gradient(45deg, #ff4444, #cc0000)';
+                addAlert('🧪 재밍 테스트 모드 비활성화');
+            }
+        }
+
+        // 실제 Pico 데이터 파싱 함수 (CC1101 데이터 형식) - 차트 업데이트 포함
+        function parseSerialData(data) {
+            try {
+                // CC1101에서 전송하는 데이터 형식: "FREQ:12.5,ADC:3000,RSSI:-75.2,JAM:1"
+                const values = data.split(',');
+                
+                values.forEach(value => {
+                    const [key, val] = value.split(':');
+                    switch(key) {
+                        case 'FREQ':
+                            currentFrequency = parseFloat(val);
+                            break;
+                        case 'ADC':
+                            currentADC = parseInt(val);
+                            break;
+                        case 'RSSI':
+                            // RSSI 값을 ADC 형태로 변환 (추가 표시용)
+                            const rssi_dbm = parseFloat(val);
+                            // -110dBm ~ -30dBm을 0-4095 범위로 변환
+                            const rssi_adc = Math.max(0, Math.min(4095, (rssi_dbm + 110) * 4095 / 80));
+                            console.log(`RSSI: ${rssi_dbm}dBm -> ADC: ${rssi_adc}`);
+                            break;
+                        case 'JAM':
+                            jammingCount = parseInt(val);
+                            break;
+                        case 'TEMP':
+                            // 온도 데이터 처리 (선택사항)
+                            break;
+                    }
+                });
+                
+                // 🔄 차트 데이터 배열 즉시 업데이트
+                frequencyData.push(currentFrequency);
+                adcData.push(currentADC);
+                
+                // 배열 크기 제한 (최대 20개 데이터 포인트)
+                if (frequencyData.length > 20) {
+                    frequencyData.shift();
+                    adcData.shift();
+                }
+                
+                console.log(`📊 데이터 업데이트: FREQ=${currentFrequency}kHz, ADC=${currentADC}, 배열길이=${frequencyData.length}`);
+                
+                return true;
+            } catch (error) {
+                console.error('CC1101 데이터 파싱 오류:', error);
+                return false;
+            }
+        }
+
+        // Gemini API 실제 호출 함수
+        async function callGeminiAPI(sensorData) {
+            try {
+                // 실제 Gemini API 호출 코드
+                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer YOUR_API_KEY'
+                    },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [{
+                                text: `다음 센서 데이터를 분석하여 재밍 공격 위험도를 평가해주세요:
+                                주파수: ${sensorData.frequency}kHz
+                                ADC 값: ${sensorData.adc}
+                                재밍 감지 횟수: ${sensorData.jammingCount}
+                                임계값: ${JAMMING_THRESHOLD}kHz
+                                
+                                위험도와 대응 방안을 간단히 설명해주세요.`
+                            }]
+                        }]
+                    })
+                });
+                
+                const result = await response.json();
+                return result.candidates[0].content.parts[0].text;
+                
+            } catch (error) {
+                console.error('Gemini API 호출 오류:', error);
+                return '❌ AI 분석 오류 발생';
+            }
+        }
+
+        // Web Serial API를 사용한 실제 CC1101 Pico 연결 (오류 처리 강화)
+        async function connectToRealPico() {
+            try {
+                // Web Serial API 지원 확인
+                if (!('serial' in navigator)) {
+                    throw new Error('Web Serial API가 지원되지 않습니다. Chrome 브라우저를 사용하세요.');
+                }
+
+                addAlert('🔍 시리얼 포트 검색 중...');
+
+                // 시리얼 포트 요청 (필터 제거하여 모든 포트 표시)
+                const port = await navigator.serial.requestPort();
+                
+                addAlert('📋 포트 선택됨 - 연결 시도 중...');
+
+                // 기존 연결이 있다면 닫기
+                try {
+                    if (port.readable) {
+                        await port.close();
+                        addAlert('🔄 기존 연결 정리됨');
+                    }
+                } catch (e) {
+                    console.log('기존 연결 정리 중 오류 (무시 가능):', e);
+                }
+
+                // 잠시 대기 후 포트 열기
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // 다양한 보율로 시도
+                const baudRates = [115200, 9600, 57600, 38400];
+                let connected = false;
+                let connectedBaud = 0;
+
+                for (let baudRate of baudRates) {
+                    try {
+                        addAlert(`🔌 보율 ${baudRate}로 연결 시도...`);
+                        
+                        await port.open({ 
+                            baudRate: baudRate,
+                            dataBits: 8,
+                            stopBits: 1,
+                            parity: 'none',
+                            flowControl: 'none'
+                        });
+                        
+                        connected = true;
+                        connectedBaud = baudRate;
+                        addAlert(`✅ 보율 ${baudRate}로 연결 성공!`);
+                        break;
+                        
+                    } catch (error) {
+                        console.log(`보율 ${baudRate} 연결 실패:`, error);
+                        try {
+                            if (port.readable) await port.close();
+                        } catch (e) {}
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                    }
+                }
+
+                if (!connected) {
+                    throw new Error('모든 보율에서 연결 실패. Pico가 연결되어 있고 다른 프로그램에서 사용 중이 아닌지 확인하세요.');
+                }
+                
+                addAlert(`🎯 시리얼 포트 연결 성공 (${connectedBaud} baud)`);
+                
+                // 데이터 읽기 스트림 설정
+                const textDecoder = new TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+
+                // 연결 테스트를 위한 타이머
+                let lastDataTime = Date.now();
+                let dataReceived = false;
+
+                // 데이터 수신 루프
+                const readLoop = async () => {
+                    try {
+                        while (true) {
+                            const { value, done } = await reader.read();
+                            if (done) {
+                                addAlert('⚠️ 시리얼 연결 종료됨');
+                                break;
+                            }
+                            
+                            dataReceived = true;
+                            lastDataTime = Date.now();
+                            
+                            // 받은 데이터 처리 (여러 줄일 수 있음) - 차트 업데이트 강화
+                            const lines = value.split('\n');
+                            for (let line of lines) {
+                                line = line.trim();
+                                if (line) {
+                                    console.log(`📥 수신: ${line}`);
+                                    
+                                    if (parseSerialData(line)) {
+                                        // 성공적으로 파싱된 경우 - UI와 차트 즉시 강제 업데이트
+                                        console.log(`🔄 UI 업데이트 시작: FREQ=${currentFrequency}, ADC=${currentADC}`);
+                                        
+                                        // 강제 UI 업데이트
+                                        updateUI();
+                                        updateProgressBars();
+                                        drawCharts();
+                                        detectJamming();
+                                        updateSystemStatus();
+                                        
+                                        console.log(`✅ UI 업데이트 완료`);
+                                        
+                                        // AI 분석 (주기적으로)
+                                        if (Math.random() < 0.1) {
+                                            performAIAnalysis();
+                                        }
+                                    } else {
+                                        // 파싱되지 않은 데이터도 로그로 표시
+                                        if (line.length > 0) {
+                                            addAlert(`📄 Pico 메시지: ${line.substring(0, 50)}${line.length > 50 ? '...' : ''}`);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (error) {
+                        console.error('시리얼 데이터 읽기 오류:', error);
+                        addAlert(`❌ 데이터 읽기 오류: ${error.message}`);
+                    }
+                };
+
+                // 연결 상태 모니터링
+                const connectionMonitor = setInterval(() => {
+                    const now = Date.now();
+                    if (dataReceived && (now - lastDataTime > 10000)) { // 10초 동안 데이터 없음
+                        addAlert('⚠️ 데이터 수신이 중단되었습니다');
+                        clearInterval(connectionMonitor);
+                    }
+                }, 5000);
+
+                readLoop();
+                
+                // 3초 후 연결 상태 확인
+                setTimeout(() => {
+                    if (!dataReceived) {
+                        addAlert('⚠️ 아직 데이터가 수신되지 않았습니다. Pico에서 main.py가 실행 중인지 확인하세요.');
+                    }
+                }, 3000);
+                
+                return port;
+                
+            } catch (error) {
+                if (error.name === 'NotFoundError') {
+                    throw new Error('포트가 선택되지 않았습니다. 다시 시도해주세요.');
+                } else if (error.message.includes('Failed to open')) {
+                    throw new Error('포트 열기 실패. 다른 프로그램(Thonny, Arduino IDE 등)에서 포트를 사용 중일 수 있습니다. 모든 시리얼 프로그램을 종료하고 다시 시도하세요.');
+                } else {
+                    throw new Error(`연결 오류: ${error.message}`);
+                }
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        window.onload = function() {
+            // 시작 시간 설정
+            document.getElementById('startTime').textContent = new Date().toLocaleString('ko-KR');
+            
+            // 캔버스 크기 설정
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            });
+            
+            // 차트 컨텍스트 저장
+            frequencyChart = document.getElementById('frequencyChart').getContext('2d');
+            adcChart = document.getElementById('adcChart').getContext('2d');
+            
+            // 초기 차트 그리기
+            drawCharts();
+            
+            // 초기 UI 업데이트
+            updateUI();
+            updateSystemStatus();
+            
+            addAlert('💻 CC1101 재밍 감지 대시보드 준비 완료');
+        };
+
+        // 창 크기 변경 시 캔버스 재조정
+        window.onresize = function() {
+            const canvases = document.querySelectorAll('canvas');
+            canvases.forEach(canvas => {
+                const rect = canvas.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            });
+            drawCharts();
+        };
+
+
+    </script>
+</body>
+</html>

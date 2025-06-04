@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pico WH 재밍 감지 모니터링 대시보드</title>
+    <title>Pico WH RSSI 재밍 감지 모니터링 대시보드</title>
     <style>
         * {
             margin: 0;
@@ -215,12 +215,47 @@
             margin: 10px 0;
             text-align: center;
         }
+
+        .rssi-meter {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+
+        .rssi-bar {
+            width: 100%;
+            height: 30px;
+            background: linear-gradient(90deg, #ff0000 0%, #ff6600 25%, #ffaa00 50%, #66ff00 75%, #00ff00 100%);
+            border-radius: 15px;
+            position: relative;
+            margin: 10px 0;
+        }
+
+        .rssi-indicator {
+            position: absolute;
+            top: -5px;
+            width: 4px;
+            height: 40px;
+            background: #ffffff;
+            border-radius: 2px;
+            box-shadow: 0 0 10px #ffffff;
+            transition: left 0.3s ease;
+        }
+
+        .rssi-scale {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            opacity: 0.7;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🛡️ Pico WH 재밍 감지 모니터링 시스템</h1>
+            <h1>🛡️ Pico WH RSSI 재밍 감지 모니터링 시스템</h1>
             <div id="systemStatus" class="status-indicator status-normal">시스템 대기</div>
             <div id="connectionStatus" class="status-indicator status-warning">Pico 연결 중...</div>
         </div>
@@ -238,30 +273,57 @@
         </div>
 
         <div class="dashboard-grid">
-            <!-- 실시간 주파수 측정 -->
+            <!-- 실시간 RSSI 측정 -->
             <div class="card">
-                <h3>📡 실시간 주파수 측정</h3>
-                <div class="metric-value" id="frequencyValue">8.5 <span class="metric-unit">kHz</span></div>
+                <h3>📡 실시간 RSSI 신호 강도</h3>
+                <div class="metric-value" id="rssiValue">-80.5 <span class="metric-unit">dBm</span></div>
                 <div class="threshold-display">
-                    <strong>재밍 임계값: 500.0 kHz</strong>
+                    <strong>재밍 임계값: -50.0 dBm</strong>
+                    <br><small>임계값 이상의 강한 신호 = 재밍 공격</small>
+                </div>
+                <div class="rssi-meter">
+                    <div class="rssi-bar">
+                        <div id="rssiIndicator" class="rssi-indicator" style="left: 25%;"></div>
+                    </div>
+                    <div class="rssi-scale">
+                        <span>-110</span>
+                        <span>-90</span>
+                        <span>-70</span>
+                        <span>-50</span>
+                        <span>-30 dBm</span>
+                    </div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="rssiChart" class="chart"></canvas>
+                </div>
+                <div class="progress-bar">
+                    <div id="rssiProgress" class="progress-fill progress-normal" style="width: 25%"></div>
+                </div>
+            </div>
+
+            <!-- 기준 주파수 -->
+            <div class="card">
+                <h3>🎯 모니터링 주파수</h3>
+                <div class="metric-value" id="frequencyValue">433.92 <span class="metric-unit">MHz</span></div>
+                <div style="margin: 15px 0;">
+                    <div>현재 스캔: <span id="currentScanFreq">433.92 MHz</span></div>
+                    <div>다음 스캔: <span id="nextScanFreq">868.3 MHz</span></div>
                 </div>
                 <div class="chart-container">
                     <canvas id="frequencyChart" class="chart"></canvas>
                 </div>
-                <div class="progress-bar">
-                    <div id="frequencyProgress" class="progress-fill progress-normal" style="width: 85%"></div>
-                </div>
+                <p style="font-size: 0.9em; opacity: 0.8;">주파수는 고정, RSSI 변화로 재밍 감지</p>
             </div>
 
             <!-- 신호 강도 (ADC 값) -->
             <div class="card">
                 <h3>📊 신호 강도 (ADC)</h3>
-                <div class="metric-value" id="adcValue">2048 <span class="metric-unit">/ 4095</span></div>
+                <div class="metric-value" id="adcValue">1024 <span class="metric-unit">/ 4095</span></div>
                 <div class="chart-container">
                     <canvas id="adcChart" class="chart"></canvas>
                 </div>
                 <div class="progress-bar">
-                    <div id="adcProgress" class="progress-fill progress-normal" style="width: 50%"></div>
+                    <div id="adcProgress" class="progress-fill progress-normal" style="width: 25%"></div>
                 </div>
             </div>
 
@@ -269,6 +331,10 @@
             <div class="card">
                 <h3>⚠️ 재밍 감지 횟수</h3>
                 <div class="metric-value" id="jammingCount">0 <span class="metric-unit">회</span></div>
+                <div class="threshold-display">
+                    <strong>RSSI > -50 dBm</strong>
+                    <br><small>강한 신호 감지 시 재밍으로 판단</small>
+                </div>
                 <div class="progress-bar">
                     <div id="jammingProgress" class="progress-fill progress-normal" style="width: 0%"></div>
                 </div>
@@ -310,12 +376,16 @@
                     <div class="level-dot"></div>
                 </div>
                 <p id="adaptationText">모드 0: 정상 모니터링</p>
+                <div style="margin-top: 10px; font-size: 0.9em; opacity: 0.8;">
+                    <div>민감도: <span id="sensitivityLevel">표준</span></div>
+                    <div>임계값: <span id="currentThreshold">-50 dBm</span></div>
+                </div>
             </div>
         </div>
 
         <!-- 재밍 상태 표시 -->
         <div id="jammingIndicator" class="jamming-indicator" style="background: rgba(0, 255, 136, 0.1); border: 2px solid #00ff88;">
-            ✅ 정상 상태 - 주파수 임계값 이하
+            ✅ 정상 상태 - RSSI 임계값 이하 (-80.5 dBm)
         </div>
 
         <!-- 알림 로그 -->
@@ -323,7 +393,7 @@
             <h3>🚨 실시간 로그</h3>
             <div id="alertLog">
                 <div class="alert-item">
-                    <div>시스템 초기화 완료</div>
+                    <div>RSSI 기반 재밍 감지 시스템 초기화 완료</div>
                     <div class="alert-time" id="startTime">2025-05-24 10:30:00</div>
                 </div>
             </div>
@@ -343,32 +413,44 @@
         let monitoringActive = false;
         let picoConnected = false;
         let geminiConnected = false;
+        let rssiData = [];
         let frequencyData = [];
         let adcData = [];
-        let currentFrequency = 8.5; // kHz
-        let currentADC = 2048;
+        let currentRSSI = -80.5; // dBm
+        let currentFrequency = 433.92; // MHz (기준 주파수)
+        let currentADC = 1024;
         let jammingCount = 0;
         let adaptationMode = 0;
         let jammingDetected = false;
         let testMode = false;
 
-        // 임계값 설정 (CC1101 RF 대역에 맞춘 재밍 감지)
-        const JAMMING_THRESHOLD = 550.0; // kHz (CC1101 실제 주파수 대역 고려)
+        // RSSI 기반 임계값 설정
+        const JAMMING_THRESHOLD_RSSI = -60.0; // dBm (이 값보다 높은 신호는 재밍으로 판단)
         const CONSECUTIVE_THRESHOLD = 3; // 연속 3회 감지 시 경고
+        const SENSITIVITY_LEVELS = {
+            0: { threshold: -50.0, name: "표준" },
+            1: { threshold: -53.0, name: "민감" },
+            2: { threshold: -55.0, name: "고민감" }
+        };
 
-        // WebSocket 또는 시리얼 통신 객체 (실제 구현에서는 Web Serial API 사용)
+        // 스캔 주파수 목록
+        const SCAN_FREQUENCIES = [433.92, 868.3, 915.0]; // MHz
+        let currentScanIndex = 0;
+
+        // WebSocket 또는 시리얼 통신 객체
         let picoConnection = null;
 
         // 차트 컨텍스트
-        let frequencyChart, adcChart;
+        let rssiChart, frequencyChart, adcChart;
 
         // 초기 데이터 생성
         for(let i = 0; i < 20; i++) {
-            frequencyData.push(8.5 + Math.random() * 2 - 1); // 7.5-9.5 kHz 범위
-            adcData.push(2048 + Math.random() * 400 - 200); // ADC 변동
+            rssiData.push(-80.5 + Math.random() * 10 - 5); // -85 ~ -75 dBm 범위
+            frequencyData.push(433.92); // 고정 주파수
+            adcData.push(1024 + Math.random() * 400 - 200); // ADC 변동
         }
 
-        // 실제 CC1101 Pico 연결 함수 (주석 해제하여 활성화)
+        // 실제 CC1101 Pico 연결 함수
         async function connectToPico() {
             const connectBtn = document.getElementById('connectBtn');
             connectBtn.textContent = '🔌 연결 중...';
@@ -380,12 +462,12 @@
                 picoConnected = true;
                 
                 document.getElementById('picoStatus').style.background = '#00ff88';
-                document.getElementById('picoConnectionText').textContent = '연결됨 - CC1101 실시간 데이터 수신';
+                document.getElementById('picoConnectionText').textContent = '연결됨 - CC1101 RSSI 실시간 수신';
                 
                 connectBtn.textContent = '✅ CC1101 연결됨';
                 connectBtn.style.background = 'linear-gradient(45deg, #00ff88, #00cc6a)';
                 
-                addAlert('🛡️ CC1101 재밍 감지 시스템 연결 성공');
+                addAlert('🛡️ CC1101 RSSI 재밍 감지 시스템 연결 성공');
                 
                 // Gemini AI 연결 시도
                 await connectToGemini();
@@ -401,7 +483,7 @@
                 
                 picoConnected = true;
                 document.getElementById('picoStatus').style.background = '#ffa500';
-                document.getElementById('picoConnectionText').textContent = '시뮬레이션 모드 - 테스트 데이터';
+                document.getElementById('picoConnectionText').textContent = '시뮬레이션 모드 - RSSI 테스트 데이터';
                 
                 connectBtn.textContent = '🧪 시뮬레이션 모드';
                 connectBtn.style.background = 'linear-gradient(45deg, #ffa500, #ff8c00)';
@@ -413,43 +495,48 @@
         // Gemini API 연결
         async function connectToGemini() {
             try {
-                // 실제 구현에서는 Gemini API 키와 함께 연결
                 await new Promise(resolve => setTimeout(resolve, 1500));
                 
                 geminiConnected = true;
                 document.getElementById('geminiStatus').style.background = '#00ff88';
-                document.getElementById('geminiConnectionText').textContent = '연결됨 - AI 분석 준비';
+                document.getElementById('geminiConnectionText').textContent = '연결됨 - RSSI 분석 준비';
                 
-                addAlert('Gemini AI 연결 성공');
+                addAlert('🤖 Gemini AI 연결 성공 - RSSI 패턴 분석 가능');
                 
             } catch (error) {
-                addAlert('Gemini AI 연결 실패');
+                addAlert('❌ Gemini AI 연결 실패');
                 document.getElementById('geminiStatus').style.background = '#ff4444';
                 document.getElementById('geminiConnectionText').textContent = '연결 실패';
             }
         }
 
-        // 실시간 데이터 업데이트 (CC1101 연결 시에는 시리얼 데이터 우선) - 차트 문제 수정
+        // 실시간 데이터 업데이트
         function updateSensorData() {
             if (!picoConnected) return;
 
             // 실제 CC1101 연결이 아닌 경우만 시뮬레이션 데이터 사용
             if (!picoConnection) {
-            // 테스트 모드일 때 재밍 시뮬레이션 (임계값 상향 조정에 맞춤)
-            if (testMode) {
-                currentFrequency = 16.0 + Math.random() * 4; // 15kHz 이상 (16-20kHz)
-                currentADC = 3500 + Math.random() * 500;
-            } else {
+                // 주파수 스캔 시뮬레이션
+                currentFrequency = SCAN_FREQUENCIES[currentScanIndex];
+                currentScanIndex = (currentScanIndex + 1) % SCAN_FREQUENCIES.length;
+                
+                // 테스트 모드일 때 재밍 시뮬레이션 (강한 RSSI)
+                if (testMode) {
+                    currentRSSI = -50.0 + Math.random() * 20; // -50 ~ -30 dBm (재밍 범위)
+                    currentADC = 3500 + Math.random() * 500;
+                } else {
                     // 정상 범위의 랜덤 데이터
-                    currentFrequency = 8.5 + Math.random() * 2 - 1; // 7.5-9.5 kHz
-                    currentADC = 2048 + Math.random() * 400 - 200;
+                    currentRSSI = -80.5 + Math.random() * 10 - 5; // -85 ~ -75 dBm
+                    currentADC = 1024 + Math.random() * 400 - 200;
                 }
 
                 // 시뮬레이션 모드에서만 데이터 배열 업데이트
+                rssiData.push(currentRSSI);
                 frequencyData.push(currentFrequency);
                 adcData.push(currentADC);
                 
-                if (frequencyData.length > 20) {
+                if (rssiData.length > 20) {
+                    rssiData.shift();
                     frequencyData.shift();
                     adcData.shift();
                 }
@@ -460,33 +547,36 @@
                 // 차트 업데이트
                 drawCharts();
                 
-                // 재밍 감지 로직
+                // 재밍 감지 로직 (RSSI 기반)
                 detectJamming();
                 
                 // AI 분석 (주기적으로)
-                if (Math.random() < 0.1) { // 10% 확률로 AI 분석 실행
+                if (Math.random() < 0.1) {
                     performAIAnalysis();
                 }
             }
-            // ⚠️ 실제 CC1101 연결 시에는 parseSerialData에서 직접 차트 데이터 업데이트됨
-            // 여기서 중복 업데이트하면 차트가 이상해짐
         }
 
         function updateUI() {
-            console.log(`🎯 updateUI 호출됨: FREQ=${currentFrequency}, ADC=${currentADC}`);
+            console.log(`🎯 updateUI 호출됨: RSSI=${currentRSSI}, FREQ=${currentFrequency}, ADC=${currentADC}`);
             
-            // 주파수 값 업데이트 (강제)
-            const freqElement = document.getElementById('frequencyValue');
-            if (freqElement) {
-                freqElement.innerHTML = `${currentFrequency.toFixed(1)} <span class="metric-unit">kHz</span>`;
-                console.log(`📊 주파수 업데이트: ${currentFrequency.toFixed(1)}kHz`);
+            // RSSI 값 업데이트
+            const rssiElement = document.getElementById('rssiValue');
+            if (rssiElement) {
+                rssiElement.innerHTML = `${currentRSSI.toFixed(1)} <span class="metric-unit">dBm</span>`;
+                console.log(`📊 RSSI 업데이트: ${currentRSSI.toFixed(1)}dBm`);
             }
             
-            // ADC 값 업데이트 (강제)
+            // 주파수 값 업데이트 (현재 스캔 중인 주파수)
+            const freqElement = document.getElementById('frequencyValue');
+            if (freqElement) {
+                freqElement.innerHTML = `${currentFrequency.toFixed(2)} <span class="metric-unit">MHz</span>`;
+            }
+            
+            // ADC 값 업데이트
             const adcElement = document.getElementById('adcValue');
             if (adcElement) {
                 adcElement.innerHTML = `${Math.round(currentADC)} <span class="metric-unit">/ 4095</span>`;
-                console.log(`📊 ADC 업데이트: ${Math.round(currentADC)}`);
             }
             
             // 재밍 카운터 업데이트
@@ -495,7 +585,19 @@
                 jammingElement.innerHTML = `${jammingCount} <span class="metric-unit">회</span>`;
             }
 
-            // 환경 데이터 시뮬레이션 (실제 CC1101 연결 시에는 고정값 사용)
+            // 스캔 주파수 표시 업데이트
+            const currentScanElement = document.getElementById('currentScanFreq');
+            const nextScanElement = document.getElementById('nextScanFreq');
+            if (currentScanElement && nextScanElement) {
+                currentScanElement.textContent = `${currentFrequency.toFixed(2)} MHz`;
+                const nextIndex = (SCAN_FREQUENCIES.indexOf(currentFrequency) + 1) % SCAN_FREQUENCIES.length;
+                nextScanElement.textContent = `${SCAN_FREQUENCIES[nextIndex].toFixed(2)} MHz`;
+            }
+
+            // RSSI 미터 업데이트
+            updateRSSIMeter();
+
+            // 환경 데이터 시뮬레이션
             if (picoConnection) {
                 // 실제 연결 시 고정값 사용
                 document.getElementById('temperature').textContent = '24.2°C';
@@ -515,61 +617,83 @@
             }
 
             updateProgressBars();
+            updateAdaptationUI();
+        }
+
+        function updateRSSIMeter() {
+            // RSSI를 -110 ~ -30 dBm 범위로 정규화하여 0-100% 위치 계산
+            const rssiPercent = Math.max(0, Math.min(100, ((currentRSSI + 110) / 80) * 100));
+            const rssiIndicator = document.getElementById('rssiIndicator');
+            if (rssiIndicator) {
+                rssiIndicator.style.left = rssiPercent + '%';
+            }
         }
 
         function updateProgressBars() {
-            // 주파수 진행률 (임계값 대비)
-            const freqPercent = Math.min(100, (currentFrequency / JAMMING_THRESHOLD) * 100);
-            const freqProgress = document.getElementById('frequencyProgress');
-            freqProgress.style.width = freqPercent + '%';
-            freqProgress.className = `progress-fill ${
-                freqPercent >= 100 ? 'progress-danger' : 
-                freqPercent >= 80 ? 'progress-warning' : 'progress-normal'
-            }`;
+            // RSSI 진행률 (임계값 대비) - 높은 값일수록 위험
+            // -110dBm = 0%, -50dBm(임계값) = 62.5%, -30dBm = 100%
+            const rssiPercent = Math.max(0, Math.min(100, ((currentRSSI + 110) / 80) * 100));
+            const rssiProgress = document.getElementById('rssiProgress');
+            if (rssiProgress) {
+                rssiProgress.style.width = rssiPercent + '%';
+                
+                // RSSI가 임계값보다 높으면 위험
+                const currentThreshold = SENSITIVITY_LEVELS[adaptationMode].threshold;
+                rssiProgress.className = `progress-fill ${
+                    currentRSSI >= currentThreshold ? 'progress-danger' : 
+                    currentRSSI >= currentThreshold - 10 ? 'progress-warning' : 'progress-normal'
+                }`;
+            }
 
             // ADC 진행률
             const adcPercent = (currentADC / 4095) * 100;
             const adcProgress = document.getElementById('adcProgress');
-            adcProgress.style.width = adcPercent + '%';
-            adcProgress.className = `progress-fill ${
-                adcPercent >= 85 ? 'progress-danger' : 
-                adcPercent >= 70 ? 'progress-warning' : 'progress-normal'
-            }`;
+            if (adcProgress) {
+                adcProgress.style.width = adcPercent + '%';
+                adcProgress.className = `progress-fill ${
+                    adcPercent >= 85 ? 'progress-danger' : 
+                    adcPercent >= 70 ? 'progress-warning' : 'progress-normal'
+                }`;
+            }
 
             // 재밍 카운터 진행률
             const jammingPercent = Math.min(100, (jammingCount / 10) * 100);
             const jammingProgressBar = document.getElementById('jammingProgress');
-            jammingProgressBar.style.width = jammingPercent + '%';
-            jammingProgressBar.className = `progress-fill ${
-                jammingPercent >= 70 ? 'progress-danger' : 
-                jammingPercent >= 40 ? 'progress-warning' : 'progress-normal'
-            }`;
+            if (jammingProgressBar) {
+                jammingProgressBar.style.width = jammingPercent + '%';
+                jammingProgressBar.className = `progress-fill ${
+                    jammingPercent >= 70 ? 'progress-danger' : 
+                    jammingPercent >= 40 ? 'progress-warning' : 'progress-normal'
+                }`;
+            }
         }
 
         function detectJamming() {
             let previousJammingState = jammingDetected;
+            
+            // 현재 적응 모드에 따른 임계값 사용
+            const currentThreshold = SENSITIVITY_LEVELS[adaptationMode].threshold;
 
-            // 주파수가 임계값을 초과하면 재밍 감지
-            if (currentFrequency >= JAMMING_THRESHOLD) {
+            // RSSI가 임계값을 초과하면 재밍 감지 (높은 값 = 강한 신호 = 재밍)
+            if (currentRSSI >= currentThreshold) {
                 if (!jammingDetected) {
                     jammingCount++;
                     jammingDetected = true;
-                    addAlert(`재밍 감지! 주파수: ${currentFrequency.toFixed(1)}kHz`);
+                    addAlert(`🚨 RSSI 재밍 감지! 신호강도: ${currentRSSI.toFixed(1)}dBm (임계값: ${currentThreshold}dBm)`);
                 }
             } else {
                 jammingDetected = false;
             }
 
-            // 적응 모드 업데이트
+            // 적응 모드 업데이트 (재밍 횟수에 따라)
             if (jammingCount >= CONSECUTIVE_THRESHOLD * 2) {
-                adaptationMode = 2; // 고위험 모드
+                adaptationMode = 2; // 고민감 모드
             } else if (jammingCount >= CONSECUTIVE_THRESHOLD) {
-                adaptationMode = 1; // 경계 모드
+                adaptationMode = 1; // 민감 모드
             } else {
-                adaptationMode = 0; // 정상 모드
+                adaptationMode = 0; // 표준 모드
             }
 
-            updateAdaptationUI();
             updateSystemStatus();
         }
 
@@ -581,11 +705,14 @@
 
             const adaptationTexts = [
                 '모드 0: 정상 모니터링',
-                '모드 1: 경계 상태 - 민감도 증가',
-                '모드 2: 위험 상태 - 최대 경계'
+                '모드 1: 민감 상태 - 임계값 낮춤',
+                '모드 2: 고민감 상태 - 최대 경계'
             ];
             
+            const currentSetting = SENSITIVITY_LEVELS[adaptationMode];
             document.getElementById('adaptationText').textContent = adaptationTexts[adaptationMode];
+            document.getElementById('sensitivityLevel').textContent = currentSetting.name;
+            document.getElementById('currentThreshold').textContent = `${currentSetting.threshold} dBm`;
         }
 
         function updateSystemStatus() {
@@ -594,13 +721,13 @@
             const jammingIndicator = document.getElementById('jammingIndicator');
 
             if (jammingDetected) {
-                systemStatus.textContent = '🚨 재밍 감지됨';
+                systemStatus.textContent = '🚨 RSSI 재밍 감지됨';
                 systemStatus.className = 'status-indicator status-danger';
                 
                 connectionStatus.textContent = '위험 상태';
                 connectionStatus.className = 'status-indicator status-danger';
                 
-                jammingIndicator.innerHTML = `🚨 재밍 공격 감지! - 주파수: ${currentFrequency.toFixed(1)}kHz`;
+                jammingIndicator.innerHTML = `🚨 RSSI 재밍 공격 감지! - 신호강도: ${currentRSSI.toFixed(1)}dBm`;
                 jammingIndicator.style.background = 'rgba(255, 68, 68, 0.2)';
                 jammingIndicator.style.borderColor = '#ff4444';
                 
@@ -611,7 +738,7 @@
                 connectionStatus.textContent = '주의 필요';
                 connectionStatus.className = 'status-indicator status-warning';
                 
-                jammingIndicator.innerHTML = '⚠️ 경계 상태 - 과거 재밍 감지됨';
+                jammingIndicator.innerHTML = `⚠️ 경계 상태 - 과거 RSSI 재밍 감지됨 (${jammingCount}회)`;
                 jammingIndicator.style.background = 'rgba(255, 165, 0, 0.2)';
                 jammingIndicator.style.borderColor = '#ffa500';
                 
@@ -622,7 +749,7 @@
                 connectionStatus.textContent = 'Pico 연결됨';
                 connectionStatus.className = 'status-indicator status-normal';
                 
-                jammingIndicator.innerHTML = '✅ 정상 상태 - 주파수 임계값 이하';
+                jammingIndicator.innerHTML = `✅ 정상 상태 - RSSI 임계값 이하 (${currentRSSI.toFixed(1)} dBm)`;
                 jammingIndicator.style.background = 'rgba(0, 255, 136, 0.1)';
                 jammingIndicator.style.borderColor = '#00ff88';
             }
@@ -633,22 +760,24 @@
             if (!geminiConnected) return;
 
             const analysisDiv = document.getElementById('aiAnalysis');
-            analysisDiv.innerHTML = '🤖 분석 중...';
+            analysisDiv.innerHTML = '🤖 RSSI 패턴 분석 중...';
 
-            // 실제로는 Gemini API 호출
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             let analysis = '';
+            const currentThreshold = SENSITIVITY_LEVELS[adaptationMode].threshold;
+            
             if (jammingDetected) {
-                analysis = `⚠️ 위험: ${currentFrequency.toFixed(1)}kHz 주파수 감지. 
-                          재밍 공격 가능성이 높습니다. 
+                analysis = `⚠️ 위험: RSSI ${currentRSSI.toFixed(1)}dBm 감지 (임계값: ${currentThreshold}dBm). 
+                          강한 신호로 인한 재밍 공격 가능성이 높습니다. 
                           즉시 대응 조치를 권장합니다.`;
             } else if (adaptationMode > 0) {
-                analysis = `📊 주의: 과거 ${jammingCount}회 재밍 감지. 
-                          현재는 안전하나 지속 모니터링 필요.`;
+                analysis = `📊 주의: 과거 ${jammingCount}회 RSSI 재밍 감지. 
+                          현재 신호강도는 ${currentRSSI.toFixed(1)}dBm로 안전하나 지속 모니터링 필요.
+                          민감도가 ${SENSITIVITY_LEVELS[adaptationMode].name} 모드로 조정됨.`;
             } else {
-                analysis = `✅ 정상: 주파수 범위 정상 (${currentFrequency.toFixed(1)}kHz). 
-                          환경이 안정적입니다.`;
+                analysis = `✅ 정상: RSSI ${currentRSSI.toFixed(1)}dBm (임계값: ${currentThreshold}dBm). 
+                          신호 강도가 정상 범위입니다. 환경이 안정적입니다.`;
             }
 
             analysisDiv.innerHTML = analysis;
@@ -656,18 +785,23 @@
         }
 
         function drawCharts() {
-            if (!frequencyChart || !adcChart) return;
+            if (!rssiChart || !frequencyChart || !adcChart) return;
 
-            // 주파수 차트
+            // RSSI 차트 - Y축 범위를 -110 ~ -30 dBm으로 설정
+            rssiChart.clearRect(0, 0, rssiChart.canvas.width, rssiChart.canvas.height);
+            const currentThreshold = SENSITIVITY_LEVELS[adaptationMode].threshold;
+            drawLineChartWithThreshold(rssiChart, rssiData, -110, -30, '#ff6b6b', currentThreshold, 'RSSI');
+
+            // 주파수 차트 - 스캔 주파수 표시
             frequencyChart.clearRect(0, 0, frequencyChart.canvas.width, frequencyChart.canvas.height);
-            drawLineChartwithThreshold(frequencyChart, frequencyData, 0, 20, '#00ccff', JAMMING_THRESHOLD);
+            drawLineChart(frequencyChart, frequencyData, 400, 950, '#00ccff');
 
             // ADC 차트
             adcChart.clearRect(0, 0, adcChart.canvas.width, adcChart.canvas.height);
             drawLineChart(adcChart, adcData, 0, 4095, '#00ff88');
         }
 
-        function drawLineChartwithThreshold(ctx, data, minY, maxY, color, threshold) {
+        function drawLineChartWithThreshold(ctx, data, minY, maxY, color, threshold, label) {
             const canvas = ctx.canvas;
             const width = canvas.width;
             const height = canvas.height;
@@ -682,6 +816,11 @@
             ctx.lineTo(width, thresholdY);
             ctx.stroke();
             ctx.setLineDash([]);
+
+            // 임계값 라벨
+            ctx.fillStyle = '#ff4444';
+            ctx.font = '12px Arial';
+            ctx.fillText(`임계값: ${threshold}dBm`, 10, thresholdY - 5);
 
             // 데이터 선 그리기
             ctx.strokeStyle = color;
@@ -703,7 +842,7 @@
 
             // 현재 값 점 그리기
             if(data.length > 0) {
-                const lastX = width;
+                const lastX = width - 5;
                 const lastY = height - ((data[data.length - 1] - minY) / (maxY - minY)) * height;
                 
                 ctx.fillStyle = data[data.length - 1] >= threshold ? '#ff4444' : color;
@@ -737,7 +876,7 @@
 
             // 현재 값 점 그리기
             if(data.length > 0) {
-                const lastX = width;
+                const lastX = width - 5;
                 const lastY = height - ((data[data.length - 1] - minY) / (maxY - minY)) * height;
                 
                 ctx.fillStyle = color;
@@ -779,7 +918,7 @@
                 monitorBtn.textContent = '⏹️ 모니터링 중지';
                 monitorBtn.onclick = stopMonitoring;
                 
-                addAlert('🔍 실시간 모니터링 시작');
+                addAlert('🔍 RSSI 기반 실시간 모니터링 시작');
                 
                 // 1초마다 센서 데이터 업데이트
                 const monitorInterval = setInterval(() => {
@@ -799,7 +938,7 @@
             monitorBtn.textContent = '🔍 모니터링 시작';
             monitorBtn.onclick = startMonitoring;
             
-            addAlert('⏹️ 모니터링 중지됨');
+            addAlert('⏹️ RSSI 모니터링 중지됨');
         }
 
         // 시스템 리셋
@@ -807,19 +946,23 @@
             jammingDetected = false;
             adaptationMode = 0;
             jammingCount = 0;
-            currentFrequency = 8.5;
-            currentADC = 2048;
+            currentRSSI = -80.5;
+            currentFrequency = 433.92;
+            currentADC = 1024;
             testMode = false;
+            currentScanIndex = 0;
             
             // 데이터 배열 초기화
+            rssiData = [];
             frequencyData = [];
             adcData = [];
             for(let i = 0; i < 20; i++) {
-                frequencyData.push(8.5 + Math.random() * 2 - 1);
-                adcData.push(2048 + Math.random() * 400 - 200);
+                rssiData.push(-80.5 + Math.random() * 10 - 5);
+                frequencyData.push(433.92);
+                adcData.push(1024 + Math.random() * 400 - 200);
             }
             
-            addAlert('🔄 시스템 리셋 완료');
+            addAlert('🔄 RSSI 재밍 감지 시스템 리셋 완료');
             updateUI();
             updateSystemStatus();
             drawCharts();
@@ -833,35 +976,31 @@
             if (testMode) {
                 testBtn.textContent = '🛑 테스트 중지';
                 testBtn.style.background = 'linear-gradient(45deg, #ff8800, #ff6600)';
-                addAlert('🧪 재밍 테스트 모드 활성화 - 16-20kHz 시뮬레이션');
+                addAlert('🧪 RSSI 재밍 테스트 모드 활성화 - 강한 신호 시뮬레이션 (-50 ~ -30 dBm)');
             } else {
                 testBtn.textContent = '🧪 재밍 테스트';
                 testBtn.style.background = 'linear-gradient(45deg, #ff4444, #cc0000)';
-                addAlert('🧪 재밍 테스트 모드 비활성화');
+                addAlert('🧪 RSSI 재밍 테스트 모드 비활성화');
             }
         }
 
-        // 실제 Pico 데이터 파싱 함수 (CC1101 데이터 형식) - 차트 업데이트 포함
+        // 실제 Pico 데이터 파싱 함수
         function parseSerialData(data) {
             try {
-                // CC1101에서 전송하는 데이터 형식: "FREQ:12.5,ADC:3000,RSSI:-75.2,JAM:1"
+                // CC1101에서 전송하는 데이터 형식: "RSSI:-45.2,FREQ:433.92,ADC:3000,JAM:1"
                 const values = data.split(',');
                 
                 values.forEach(value => {
                     const [key, val] = value.split(':');
                     switch(key) {
+                        case 'RSSI':
+                            currentRSSI = parseFloat(val);
+                            break;
                         case 'FREQ':
                             currentFrequency = parseFloat(val);
                             break;
                         case 'ADC':
                             currentADC = parseInt(val);
-                            break;
-                        case 'RSSI':
-                            // RSSI 값을 ADC 형태로 변환 (추가 표시용)
-                            const rssi_dbm = parseFloat(val);
-                            // -110dBm ~ -30dBm을 0-4095 범위로 변환
-                            const rssi_adc = Math.max(0, Math.min(4095, (rssi_dbm + 110) * 4095 / 80));
-                            console.log(`RSSI: ${rssi_dbm}dBm -> ADC: ${rssi_adc}`);
                             break;
                         case 'JAM':
                             jammingCount = parseInt(val);
@@ -872,17 +1011,19 @@
                     }
                 });
                 
-                // 🔄 차트 데이터 배열 즉시 업데이트
+                // 차트 데이터 배열 즉시 업데이트
+                rssiData.push(currentRSSI);
                 frequencyData.push(currentFrequency);
                 adcData.push(currentADC);
                 
                 // 배열 크기 제한 (최대 20개 데이터 포인트)
-                if (frequencyData.length > 20) {
+                if (rssiData.length > 20) {
+                    rssiData.shift();
                     frequencyData.shift();
                     adcData.shift();
                 }
                 
-                console.log(`📊 데이터 업데이트: FREQ=${currentFrequency}kHz, ADC=${currentADC}, 배열길이=${frequencyData.length}`);
+                console.log(`📊 데이터 업데이트: RSSI=${currentRSSI}dBm, FREQ=${currentFrequency}MHz, ADC=${currentADC}, 배열길이=${rssiData.length}`);
                 
                 return true;
             } catch (error) {
@@ -891,56 +1032,19 @@
             }
         }
 
-        // Gemini API 실제 호출 함수
-        async function callGeminiAPI(sensorData) {
-            try {
-                // 실제 Gemini API 호출 코드
-                const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer YOUR_API_KEY'
-                    },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: `다음 센서 데이터를 분석하여 재밍 공격 위험도를 평가해주세요:
-                                주파수: ${sensorData.frequency}kHz
-                                ADC 값: ${sensorData.adc}
-                                재밍 감지 횟수: ${sensorData.jammingCount}
-                                임계값: ${JAMMING_THRESHOLD}kHz
-                                
-                                위험도와 대응 방안을 간단히 설명해주세요.`
-                            }]
-                        }]
-                    })
-                });
-                
-                const result = await response.json();
-                return result.candidates[0].content.parts[0].text;
-                
-            } catch (error) {
-                console.error('Gemini API 호출 오류:', error);
-                return '❌ AI 분석 오류 발생';
-            }
-        }
-
-        // Web Serial API를 사용한 실제 CC1101 Pico 연결 (오류 처리 강화)
+        // Web Serial API를 사용한 실제 CC1101 Pico 연결
         async function connectToRealPico() {
             try {
-                // Web Serial API 지원 확인
                 if (!('serial' in navigator)) {
                     throw new Error('Web Serial API가 지원되지 않습니다. Chrome 브라우저를 사용하세요.');
                 }
 
                 addAlert('🔍 시리얼 포트 검색 중...');
 
-                // 시리얼 포트 요청 (필터 제거하여 모든 포트 표시)
                 const port = await navigator.serial.requestPort();
                 
                 addAlert('📋 포트 선택됨 - 연결 시도 중...');
 
-                // 기존 연결이 있다면 닫기
                 try {
                     if (port.readable) {
                         await port.close();
@@ -950,10 +1054,8 @@
                     console.log('기존 연결 정리 중 오류 (무시 가능):', e);
                 }
 
-                // 잠시 대기 후 포트 열기
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
-                // 다양한 보율로 시도
                 const baudRates = [115200, 9600, 57600, 38400];
                 let connected = false;
                 let connectedBaud = 0;
@@ -990,16 +1092,13 @@
                 
                 addAlert(`🎯 시리얼 포트 연결 성공 (${connectedBaud} baud)`);
                 
-                // 데이터 읽기 스트림 설정
                 const textDecoder = new TextDecoderStream();
                 const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
                 const reader = textDecoder.readable.getReader();
 
-                // 연결 테스트를 위한 타이머
                 let lastDataTime = Date.now();
                 let dataReceived = false;
 
-                // 데이터 수신 루프
                 const readLoop = async () => {
                     try {
                         while (true) {
@@ -1012,7 +1111,6 @@
                             dataReceived = true;
                             lastDataTime = Date.now();
                             
-                            // 받은 데이터 처리 (여러 줄일 수 있음) - 차트 업데이트 강화
                             const lines = value.split('\n');
                             for (let line of lines) {
                                 line = line.trim();
@@ -1020,10 +1118,8 @@
                                     console.log(`📥 수신: ${line}`);
                                     
                                     if (parseSerialData(line)) {
-                                        // 성공적으로 파싱된 경우 - UI와 차트 즉시 강제 업데이트
-                                        console.log(`🔄 UI 업데이트 시작: FREQ=${currentFrequency}, ADC=${currentADC}`);
+                                        console.log(`🔄 UI 업데이트 시작: RSSI=${currentRSSI}, FREQ=${currentFrequency}, ADC=${currentADC}`);
                                         
-                                        // 강제 UI 업데이트
                                         updateUI();
                                         updateProgressBars();
                                         drawCharts();
@@ -1032,12 +1128,10 @@
                                         
                                         console.log(`✅ UI 업데이트 완료`);
                                         
-                                        // AI 분석 (주기적으로)
                                         if (Math.random() < 0.1) {
                                             performAIAnalysis();
                                         }
                                     } else {
-                                        // 파싱되지 않은 데이터도 로그로 표시
                                         if (line.length > 0) {
                                             addAlert(`📄 Pico 메시지: ${line.substring(0, 50)}${line.length > 50 ? '...' : ''}`);
                                         }
@@ -1051,10 +1145,9 @@
                     }
                 };
 
-                // 연결 상태 모니터링
                 const connectionMonitor = setInterval(() => {
                     const now = Date.now();
-                    if (dataReceived && (now - lastDataTime > 10000)) { // 10초 동안 데이터 없음
+                    if (dataReceived && (now - lastDataTime > 10000)) {
                         addAlert('⚠️ 데이터 수신이 중단되었습니다');
                         clearInterval(connectionMonitor);
                     }
@@ -1062,7 +1155,6 @@
 
                 readLoop();
                 
-                // 3초 후 연결 상태 확인
                 setTimeout(() => {
                     if (!dataReceived) {
                         addAlert('⚠️ 아직 데이터가 수신되지 않았습니다. Pico에서 main.py가 실행 중인지 확인하세요.');
@@ -1084,10 +1176,8 @@
 
         // 페이지 로드 시 초기화
         window.onload = function() {
-            // 시작 시간 설정
             document.getElementById('startTime').textContent = new Date().toLocaleString('ko-KR');
             
-            // 캔버스 크기 설정
             const canvases = document.querySelectorAll('canvas');
             canvases.forEach(canvas => {
                 const rect = canvas.getBoundingClientRect();
@@ -1095,21 +1185,17 @@
                 canvas.height = rect.height;
             });
             
-            // 차트 컨텍스트 저장
+            rssiChart = document.getElementById('rssiChart').getContext('2d');
             frequencyChart = document.getElementById('frequencyChart').getContext('2d');
             adcChart = document.getElementById('adcChart').getContext('2d');
             
-            // 초기 차트 그리기
             drawCharts();
-            
-            // 초기 UI 업데이트
             updateUI();
             updateSystemStatus();
             
-            addAlert('💻 CC1101 재밍 감지 대시보드 준비 완료');
+            addAlert('💻 CC1101 RSSI 재밍 감지 대시보드 준비 완료');
         };
 
-        // 창 크기 변경 시 캔버스 재조정
         window.onresize = function() {
             const canvases = document.querySelectorAll('canvas');
             canvases.forEach(canvas => {
@@ -1119,8 +1205,6 @@
             });
             drawCharts();
         };
-
-
     </script>
 </body>
 </html>
